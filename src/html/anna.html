@@ -1,0 +1,27 @@
+<head><style>
+.chart { width: 800px; }
+</style>
+<script src = "https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+<script>
+$( document ).ready(function() {
+   console.log( "ready!" );
+   $("#first_button").click(function(){
+      alert("I love you!")
+   })
+   $("#second_button").click(function(){
+      alert("now you've learned something new (hopefully)")
+   })
+   $("#third_button").click(function(){
+      var width = $(this).width();
+      $(this).width(width+10);
+   })
+});   
+</script>
+</head>
+<div id="chart">
+   <button id="first_button">do NOT click this!</button>
+   <button id="second_button">do anything</button>
+   <button id="third_button">tee</button>
+</div>
+<div>what do you want to do?</div>
+
