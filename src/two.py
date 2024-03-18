@@ -20,7 +20,7 @@ from adafruit_ads7830.analog_in import AnalogIn
 from adafruit_onewire.bus import OneWireBus
 from adafruit_ds18x20 import DS18X20
 from adafruit_seesaw.seesaw import Seesaw
-from cloud_io import Feeder
+# from cloud_io import Feeder
 
 cs = digitalio.DigitalInOut(board.D22)
 set_pin = digitalio.DigitalInOut(board.D22)
