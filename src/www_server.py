@@ -8,7 +8,7 @@ import tornado.log
 import tornado.locks
 import tornado.websocket
 import json
-import datetime
+# import datetime
 import logging
 import time
 import os
@@ -91,49 +91,70 @@ from tornado.options import define, options
 #         self.write(self.store.get())
 
 class ActionHandler(tornado.web.RequestHandler):
-    def initialize(self, store):
-        self.store = store
+    def initialize(self, manager):
+        self.manager = manager
     def put(self):
         action = self.get_argument("action")
-        self.store.addAction(action)
-        self.write(dict(result="ok", actions=self.store.getActions(clear=False)))
+        self.manager.addAction(action)
+        self.write(dict(result="ok", actions=self.manager.getActions(clear=False)))
     def get(self):
-        self.write(dict(actions=self.store.getActions(clear=False)))
+        self.write(dict(actions=self.manager.getActions(clear=False)))
 
 class ChartsHandler(tornado.web.RequestHandler):
     def initialize(self, manager):
         self.manager = manager
     def get(self):
-        chartName = self.request.uri.split("/")[-1]
+        x_format = "%I:%M %p %Z"
+        datetimeline = pygal.DateTimeLine(
+            x_label_rotation=35, truncate_label=-1,
+            x_value_formatter=lambda dt: dt.strftime(x_format))
 
-        charts = {}
-        for series in self.manager.get_sensor_names():
-            x_format = "%d, %b %Y at %I:%M:%S %p"
-            datetimeline = pygal.DateTimeLine(
-                x_label_rotation=35, truncate_label=-1,
-                x_value_formatter=lambda dt: dt.strftime(x_format))
-
-            data = self.manager.get_data(series)
-            datetimeline.add(series, data)
-            charts[series] = datetimeline.render()
+        for sensor_name in self.manager.get_sensor_names():
+            data = self.manager.get_data(sensor_name)
+            datetimeline.add(sensor_name, data)
         self.set_header('Content-Type', 'application/xhtml+xml')
-        self.write(charts[chartName])
+        self.write(datetimeline.render())
+
+    # def get2(self):
+    #     chartName = self.request.uri.split("/")[-1]
+
+    #     charts = {}
+
+    #     datetimeline = pygal.DateTimeLine(
+    #         x_label_rotation=35, truncate_label=-1,
+    #         x_value_formatter=lambda dt: dt.strftime(x_format))
+
+    #     for series in self.manager.get_sensor_names():
+    #         x_format = "%I:%M:%S %p %Z"
+            
+    #         data = self.manager.get_data(series)
+    #         datetimeline.add(series, data)
+    #         charts[series] = datetimeline.render()
+    #     print(charts)
+    #     self.set_header('Content-Type', 'application/xhtml+xml')
+
+    #     if chartName not in charts:
+    #         charts[chartName] = {}
+            
+    #     self.write(charts[chartName])
 
 
 class DefaultHandler(tornado.web.RequestHandler):
     def initialize(self, manager):
         self.manager = manager
     def get(self):
-        self.render("raw.html")
+        self.render("index.html")
 
 class StatsSocket(tornado.websocket.WebSocketHandler):
     clients = set()
-
+    def initialize(self, manager):
+        self.manager = manager
     def open(self):
         StatsSocket.clients.add(self)
 
     def on_message(self, message):
-        self.write_message(u"You said: " + message)
+        # self.write_message(u"You said: " + message)
+        self.manager.send()
 
     def on_close(self):
         StatsSocket.clients.remove(self)
@@ -146,15 +167,15 @@ class StatsSocket(tornado.websocket.WebSocketHandler):
 
 
 class Application(tornado.web.Application):
-    def __init__(self, store):
+    def __init__(self, manager):
         handlers = [
-            (r"/ws", StatsSocket),
+            (r"/ws", StatsSocket, dict(manager=manager)),
             # (r"/data/.*", DataHandler, dict(store=store)),
-            (r"/actions", ActionHandler, dict(store=store)),
+            (r"/actions", ActionHandler, dict(manager=manager)),
             (r'/favicon.ico', tornado.web.StaticFileHandler),
             (r'/static/', tornado.web.StaticFileHandler),
-            (r"/charts/.*", ChartsHandler, dict(manager=store)),
-            (r"/.*", DefaultHandler, dict(manager=store)),
+            (r"/charts/.*", ChartsHandler, dict(manager=manager)),
+            (r"/.*", DefaultHandler, dict(manager=manager)),
         ]
         settings = dict(
             template_path=os.path.join(os.path.dirname(__file__), "html"),

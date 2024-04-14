@@ -7,30 +7,31 @@ import os
 import glob
 import random
 import datetime
-# import aiofiles
+import aiofiles
 
-# import busio
-# import board
-# import digitalio
-# import adafruit_rfm9x
-# import adafruit_mcp9808
-# import digitalio
-# import pwmio
+import busio
+import board
+import digitalio
+import adafruit_rfm9x
+import adafruit_mcp9808
+import digitalio
+import pwmio
 import logging
 from tornado.options import define, options
 
-# import adafruit_ads7830.ads7830 as ADC
-# from adafruit_ads7830.analog_in import AnalogIn
-# from adafruit_onewire.bus import OneWireBus
-# from adafruit_ds18x20 import DS18X20
-# from adafruit_seesaw.seesaw import Seesaw
+import adafruit_ads7830.ads7830 as ADC
+from adafruit_ads7830.analog_in import AnalogIn
+from adafruit_onewire.bus import OneWireBus
+from adafruit_ds18x20 import DS18X20
+from adafruit_seesaw.seesaw import Seesaw
 from www_server import Application, StatsSocket
+from ip import IPmanager
 
-# cs = digitalio.DigitalInOut(board.D22)
-# set_pin = digitalio.DigitalInOut(board.D22)
-# set_pin.direction = digitalio.Direction.OUTPUT
-# unset_pin = digitalio.DigitalInOut(board.D27)
-# unset_pin.direction = digitalio.Direction.OUTPUT
+cs = digitalio.DigitalInOut(board.D22)
+set_pin = digitalio.DigitalInOut(board.D22)
+set_pin.direction = digitalio.Direction.OUTPUT
+unset_pin = digitalio.DigitalInOut(board.D27)
+unset_pin.direction = digitalio.Direction.OUTPUT
 
 
 # os.system("play /usr/share/sounds/alsa/Noise.wav")
@@ -60,20 +61,55 @@ class Relay():
         else:
             self.set_on()
 
-class Sensor(object):
+
+class Store(object):
+    def __init__(self):
+        self._store = dict(minutes=[], hours=[])
+        self.minutes = 60*24 # last 24h in minutes
+        self.hours = 24*365 # 1 year in hours
+        self.minutes_buffer = []
+    def load(self, filename):
+        try:
+            with open(filename, "r") as f:
+                raw_data = f.read()
+                self._store = json.loads(raw_data)
+        except FileNotFoundError:
+            print("sensor data file %s not found" % filename)
+    def save(self, filename):
+        with open(filename, "w+") as f:
+            raw_data = json.dumps(self._store)
+            f.write(raw_data)
+    def insert(self, value):
+        now = time.time()
+        self._store["minutes"].append((now, value))
+        if len(self._store["minutes"]) > self.minutes:
+            del self._store["minutes"][0]
+
+        self.minutes_buffer.append(value)
+        if len(self.minutes_buffer) >= 60:
+            hour_average = sum(self.minutes_buffer) / len(self.minutes_buffer)
+            self.minutes_buffer = []
+
+            self._store["hours"].append((now, hour_average))
+            if len(self._store["hours"]) > self.hours:
+                del self._store["hours"][0]
+    def get_last_value(self):
+        return self._store["minutes"][-1][1]
+    def get_minutes(self):
+        return self._store["minutes"]
+
+class Sensor(Store):
     def __init__(self, name=""):
+        Store.__init__(self)
         self.name = name
         self.instant_value = 0
         self.instant_values_sum = 0
         self.instant_values_tot = 0
         self.last_datapoint = 0
-        self.store = dict(minutes=[], hours=[])
         self.datapoint_interval = 60 #seconds
-
-        self.minutes = 60*24 # last 24h in minutes
-        self.hours = 24*365 # 1 year in hours
-        self.minutes_buffer = []
-
+        self.filename = "%s.json" % name
+        self.load(self.filename)
+    
     async def get_measurement(self):
         raise NotImplementedError
     async def update(self):
@@ -88,35 +124,24 @@ class Sensor(object):
                 self.instant_values_sum = 0
                 self.instant_values_tot = 0
 
-                self.store["minutes"].append((now, value))
-                if len(self.store["minutes"]) > self.minutes:
-                    del self.store["minutes"][0]
-
-                self.minutes_buffer.append(value)
-                if len(self.minutes_buffer) >= 60:
-                    hour_average = sum(self.minutes_buffer) / len(self.minutes_buffer)
-                    self.store["hours"].append((now, hour_average))
-                    self.minutes_buffer = []
-
-                    if len(self.store["hours"]) > self.hours:
-                        del self.store["hours"][0]
-
-
+            self.insert(value)
             self.last_datapoint = now
 
         await asyncio.sleep(0.001)
         future = asyncio.create_task(self.update())
+
+
     def get_stats(self):
         stats = {}
-        stats["store_size"] = len(self.store["minutes"])
+        stats["store_size"] = len(self.get_minutes())
         stats["inst_total"] = self.instant_values_tot
         stats["inst_sum"] = self.instant_values_sum
         return stats
-    def get(self):
-        if self.store:
-            return int(1000*self.store[-1][0])/1000
-        else:
-            return None
+    # def get(self):
+    #     if self.store:
+    #         return int(1000*self.store[-1][0])/1000
+    #     else:
+    #         return None
 
 class Temperature(Sensor):
     def __init__(self):
@@ -162,14 +187,13 @@ class Temperature(Sensor):
             self.instant_value = temp_f
             # self.instant_values_tot += 1
 
-        # future = asyncio.create_task(self.update())
-
 class Light(Sensor):
     def __init__(self, adc, pin):
         super(Light, self).__init__(name="light")
         self.pin = AnalogIn(adc, pin)
     async def get_measurement(self):
-        self.instant_value = self.pin.value
+        max_value = 65536
+        self.instant_value = 100*self.pin.value/max_value
 
 class Microphone(Sensor):
     def __init__(self, mcp, pin):
@@ -178,7 +202,7 @@ class Microphone(Sensor):
         self.past_values = []
         self.past_values_size = 10
     async def get_measurement(self):
-        val = self.pin.value/65536
+        val = 100.0*self.pin.value/65536
         self.past_values.append(val)
         if len(self.past_values) > self.past_values_size:
             del self.past_values[0]
@@ -218,6 +242,7 @@ class TestSensor(Sensor):
 def date_cmp(pair, threshold):
     date = pair[0]
     return time.time() - date < threshold
+    # return datetime.datetime.now() - date < datetime.timedelta(seconds=threshold)
 
 class Manager(object):
     def __init__(self, sensors):
@@ -232,19 +257,29 @@ class Manager(object):
     def get_data(self, sensor_name):
         for sensor in self.sensors:
             if sensor.name == sensor_name:
-                return list(filter(
-                    lambda datalist: date_cmp(datalist, self.retain_threshold), 
-                    sensor.store["minutes"]))
+                func = lambda datalist: date_cmp(datalist, self.retain_threshold)
+                date_tranform = lambda x: (datetime.datetime.fromtimestamp(x[0]), x[1])
+                result = list(filter(func, sensor.get_minutes()))
+                result = list(map(date_tranform, result))
+                return result
         return (0,0)
 
-    async def send(self):
+    def loop(self):
+        self.send()
+        asyncio.get_event_loop().call_later(3, self.loop)
+
+    def save_to_file(self):
+        for sensor in self.sensors:
+            sensor.save(sensor.filename)
+        asyncio.get_event_loop().call_later(30, self.save_to_file)
+
+    def send(self):
         for s in self.sensors:
             data = dict(
                 sensor_name=s.name, 
-                sensor_value=s.store["minutes"][-1][1], 
+                sensor_value=s.get_last_value(), 
                 sensor_stats=s.get_stats(),
                 tstamp=time.time())
-            # self.buffer.append(data)
             StatsSocket.send_message(data)
 
         # if len(self.buffer) > 10:
@@ -262,51 +297,47 @@ class Manager(object):
         #             tstamp=time.time())
         #         self.buffer.append(data)
 
-        await asyncio.sleep(5)
-
-        future = asyncio.create_task(self.send())
-
-
 async def main(i2c):
     
     LIGHT_PIN = 0
     MIC_PIN = 1
     sensors = []
 
-    # adc = ADC.ADS7830(i2c)
-    # light = Light(adc, LIGHT_PIN)
-    # await light.update()
-    # sensors.append(light)
+    adc = ADC.ADS7830(i2c)
+    light = Light(adc, LIGHT_PIN)
+    await light.update()
+    sensors.append(light)
 
-    # mic = Microphone(adc, MIC_PIN)
-    # await mic.update()
-    # sensors.append(mic)
+    mic = Microphone(adc, MIC_PIN)
+    await mic.update()
+    sensors.append(mic)
 
-    # internalTemp = InternalTemperature(i2c)
-    # await internalTemp.update()
-    # sensors.append(internalTemp)
+    internalTemp = InternalTemperature(i2c)
+    await internalTemp.update()
+    sensors.append(internalTemp)
 
     # soil_conductivity = SoilConductivity()
     # await soil_conductivity.update()
     # sensors.append(soil_conductivity)
 
-    # temp = Temperature()
-    # await temp.update()
-    # sensors.append(temp)
+    temp = Temperature()
+    await temp.update()
+    sensors.append(temp)
 
-    sensor = TestSensor()
-    await sensor.update()
-    sensors.append(sensor)
+    # sensor = TestSensor()
+    # await sensor.update()
+    # sensors.append(sensor)
 
     manager = Manager(sensors)
-    await manager.send()
+    manager.loop()
+    asyncio.get_event_loop().call_later(30, manager.save_to_file)
+
+    ipmanager = IPmanager()
+    asyncio.get_event_loop().call_later(60, ipmanager.check)
 
     tornado.options.parse_command_line()
     tornado.log.enable_pretty_logging()
 
-    # store = Store()
-    # await store.load_from_local_file()
-    
     app = Application(manager)
     logger = logging.getLogger("tornado.access")
     # logger.propagate = False
@@ -315,24 +346,24 @@ async def main(i2c):
     # pc = tornado.ioloop.PeriodicCallback(brain.periodic, 1000)
     # pc.start()
     app.listen(options.port)
-
+    
     shutdown_event = asyncio.Event()
     await shutdown_event.wait()
     
 
 
 if __name__ == "__main__":
-    # try:
-    #     with board.I2C() as i2c:
-    #         asyncio.run(main(i2c))
-    # except KeyboardInterrupt:
-    #     print("time to die")
-
-
     try:
-        asyncio.run(main(None))
+        with board.I2C() as i2c:
+            asyncio.run(main(i2c))
     except KeyboardInterrupt:
         print("time to die")
+
+
+    # try:
+    #     asyncio.run(main(None))
+    # except KeyboardInterrupt:
+    #     print("time to die")
 
 
 

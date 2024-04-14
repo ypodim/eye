@@ -1,0 +1,65 @@
+<!doctype html>
+<head>
+<meta charset="UTF-8" />
+<script src="/static/jquery.min.js"></script>
+<style>
+.chart { width: 500px; height: 400px; }
+.sensor { margin: 10px; flow:horizontal; display:inline-block; }
+button { width: 100px; display:block; margin: 5px; }
+</style></head>
+<body>
+<div id="chart">
+   <div class="sensor" id="internaltemp"></div>
+   <div class="sensor" id="soil_moisture"></div>
+   <div class="sensor" id="mic"></div>
+   <div class="sensor" id="light"></div>
+   <div class="sensor" id="temperature"></div>
+   <div class="sensor" id="testSensor"></div>
+</div>
+
+
+<embed class="chart" type="image/svg+xml" src="/charts/super" />
+<div id="controls">
+   <button class="toggle" id="internaltemp">internaltemp</button>
+   <button class="toggle" id="soil_moisture">soil_moisture</button>
+   <button class="toggle" id="mic">mic</button>
+   <button class="toggle" id="light">light</button>
+   <button class="toggle" id="temperature">temperature</button>
+   <button class="toggle" id="testSensor">testSensor</button>
+</div>
+
+<script>
+var ws = new WebSocket("ws://"+location.host+"/ws");
+ws.onopen = function() {
+   ws.send("send me some stuff");
+};
+ws.onmessage = function (evt) {
+   var data = JSON.parse(evt.data);
+   id = "#"+data.sensor_name;
+   
+   // var embed = $("<embed />").addClass("chart").attr("type", "image/svg+xml");
+   // embed.attr("src", "/charts/"+data.sensor_name);
+
+   var sensor_name = $("<div></div>").addClass("sensor_name").html(data.sensor_name);
+   var sensor_value = $("<div></div>").addClass("sensor_value").html(data.sensor_value);
+
+   var store_size = $("<div></div>").addClass("store_size").html("store_size:"+data.sensor_stats.store_size);
+   var inst_sum = $("<div></div>").addClass("store_size").html("inst_sum:"+data.sensor_stats.inst_sum);
+   var inst_total = $("<div></div>").addClass("inst_total").html("inst_total:"+data.sensor_stats.inst_total);
+
+   $(id).html("").append(sensor_name, sensor_value, store_size, inst_sum, inst_total);
+};
+
+$(document).ready(function() {  
+   
+}); 
+
+var embed = $("embed.chart");
+$(".toggle").on("click", function(){
+   console.log($(this).attr("id"));
+   
+   console.log(embed.attr("src"));
+})
+</script>
+</body>
+</html>
