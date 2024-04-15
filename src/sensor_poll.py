@@ -333,7 +333,7 @@ async def main(i2c):
     asyncio.get_event_loop().call_later(30, manager.save_to_file)
 
     ipmanager = IPmanager()
-    asyncio.get_event_loop().call_later(60, ipmanager.check)
+    asyncio.get_event_loop().call_later(60, ipmanager.checkin)
 
     tornado.options.parse_command_line()
     tornado.log.enable_pretty_logging()
@@ -343,8 +343,6 @@ async def main(i2c):
     # logger.propagate = False
 
     io_loop = tornado.ioloop.IOLoop.current()
-    # pc = tornado.ioloop.PeriodicCallback(brain.periodic, 1000)
-    # pc.start()
     app.listen(options.port)
     
     shutdown_event = asyncio.Event()

@@ -2,6 +2,16 @@ import datetime
 import asyncio
 import tornado.web
 
+class ResolveHandler(tornado.web.RequestHandler):
+    def initialize(self, store):
+        self.store = store
+    def get(self):
+        response = "oops"
+        if len(self.store["ips"]):
+            response = "http://%s:5433/" % self.store["ips"][-1]
+        
+        self.write(response)
+
 class DefaultHandler(tornado.web.RequestHandler):
     def initialize(self, store):
         self.store = store
@@ -25,6 +35,7 @@ class DefaultHandler(tornado.web.RequestHandler):
 class Application(tornado.web.Application):
     def __init__(self, store):
         handlers = [
+            (r"/skatoules", ResolveHandler, dict(store=store)),
             (r"/.*", DefaultHandler, dict(store=store)),
         ]
         settings = dict(
