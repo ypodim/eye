@@ -8,7 +8,7 @@ class ResolveHandler(tornado.web.RequestHandler):
     def get(self):
         response = "oops"
         if len(self.store["ips"]):
-            response = "http://%s:5433/" % self.store["ips"][-1]
+            response = "http://%s:5433/" % self.store["ips"][-1][0]
         
         self.write(response)
 

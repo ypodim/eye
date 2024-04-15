@@ -7,7 +7,7 @@ class IPmanager(object):
 		self.checkin()
 		
 	def checkin(self):
-		raw = get('http://45.33.41.36:9000/').content.decode('utf8')
+		raw = get('http://45.33.41.36:9000/insert').content.decode('utf8')
 		data = json.loads(raw).get("ips")
 		print(data[-1])
 
