@@ -16,63 +16,63 @@ import logging
 from tornado.options import define, options
 
 
-class Store():
-    def __init__(self, *args, **kwargs):
-        self.filename = "data.json"
-        self.store = {}
-        self.last_update = 0
-        self.actions = []
-        self.store_entries = 0
+# class Store():
+#     def __init__(self, *args, **kwargs):
+#         self.filename = "data.json"
+#         self.store = {}
+#         self.last_update = 0
+#         self.actions = []
+#         self.store_entries = 0
 
-        self.logger = logging.getLogger(__name__)
-        logging.basicConfig(filename='www.log', encoding='utf-8', level=logging.DEBUG)
-        self.logger.info("Store started")
-        # try:
-        #     with open(self.filename, "r") as f:
-        #         self.store = f.read()
-        # except:
-        #     pass
+#         self.logger = logging.getLogger(__name__)
+#         logging.basicConfig(filename='www.log', encoding='utf-8', level=logging.DEBUG)
+#         self.logger.info("Store started")
+#         # try:
+#         #     with open(self.filename, "r") as f:
+#         #         self.store = f.read()
+#         # except:
+#         #     pass
 
-    def addAction(self, action):
-        self.actions.append(action)
-    def getActions(self, clear=True):
-        actions = self.actions
-        if clear: self.actions = []
-        return actions
-    def add(self, sensor_name, sensor_value, tstamp):
+#     def addAction(self, action):
+#         self.actions.append(action)
+#     def getActions(self, clear=True):
+#         actions = self.actions
+#         if clear: self.actions = []
+#         return actions
+#     def add(self, sensor_name, sensor_value, tstamp):
         
-        '''
-        {"sensor_name1": [
-            [sensor_val1, tstamp1]],
-        }
-        '''
+#         '''
+#         {"sensor_name1": [
+#             [sensor_val1, tstamp1]],
+#         }
+#         '''
         
-        self.logger.debug("%s, %s, %s" % (sensor_name, sensor_value, tstamp))
+#         self.logger.debug("%s, %s, %s" % (sensor_name, sensor_value, tstamp))
 
-        pair = (tstamp, sensor_value)
-        if sensor_name not in self.store:
-            self.store[sensor_name] = []
-        self.store[sensor_name].append(pair)
-        self.store_entries += 1
-        self.last_update = time.time()
+#         pair = (tstamp, sensor_value)
+#         if sensor_name not in self.store:
+#             self.store[sensor_name] = []
+#         self.store[sensor_name].append(pair)
+#         self.store_entries += 1
+#         self.last_update = time.time()
 
-        if self.store_entries > 24*3600:
-            self.logger.info("24h window")
-            with open(self.filename, "w+") as f:
-                f.write(json.dumps(self.store))
-                self.store = {}
-                self.store_entries = 0
+#         if self.store_entries > 24*3600:
+#             self.logger.info("24h window")
+#             with open(self.filename, "w+") as f:
+#                 f.write(json.dumps(self.store))
+#                 self.store = {}
+#                 self.store_entries = 0
 
-    def get(self):
-        return dict(data=self.store, 
-            entries=self.store_entries, 
-            last_update="%s" % self.last_update)
-    async def load_from_local_file(self):
-        pass
-    def get_stats(self):
-        stats = {}
-        for sensor in self.store:
-            stats[sensor] = len(self.store[sensor])
+#     def get(self):
+#         return dict(data=self.store, 
+#             entries=self.store_entries, 
+#             last_update="%s" % self.last_update)
+#     async def load_from_local_file(self):
+#         pass
+#     def get_stats(self):
+#         stats = {}
+#         for sensor in self.store:
+#             stats[sensor] = len(self.store[sensor])
 
 # class DataHandler(tornado.web.RequestHandler):
 #     def initialize(self, store):
@@ -100,10 +100,12 @@ class ActionHandler(tornado.web.RequestHandler):
     def get(self):
         self.write(dict(actions=self.store.getActions(clear=False)))
 
-class DefaultHandler(tornado.web.RequestHandler):
+class ChartsHandler(tornado.web.RequestHandler):
     def initialize(self, manager):
         self.manager = manager
     def get(self):
+        chartName = self.request.uri.split("/")[-1]
+
         charts = {}
         for series in self.manager.get_sensor_names():
             x_format = "%d, %b %Y at %I:%M:%S %p"
@@ -113,15 +115,21 @@ class DefaultHandler(tornado.web.RequestHandler):
 
             data = self.manager.get_data(series)
             datetimeline.add(series, data)
-            charts[series] = datetimeline.render_data_uri()
+            charts[series] = datetimeline.render()
+        self.set_header('Content-Type', 'application/xhtml+xml')
+        self.write(charts[chartName])
 
-        self.render("raw.html", charts=charts)
+
+class DefaultHandler(tornado.web.RequestHandler):
+    def initialize(self, manager):
+        self.manager = manager
+    def get(self):
+        self.render("raw.html")
 
 class StatsSocket(tornado.websocket.WebSocketHandler):
     clients = set()
 
     def open(self):
-        print("opened")
         StatsSocket.clients.add(self)
 
     def on_message(self, message):
@@ -143,9 +151,10 @@ class Application(tornado.web.Application):
             (r"/ws", StatsSocket),
             # (r"/data/.*", DataHandler, dict(store=store)),
             (r"/actions", ActionHandler, dict(store=store)),
-            (r"/", DefaultHandler, dict(manager=store)),
             (r'/favicon.ico', tornado.web.StaticFileHandler),
             (r'/static/', tornado.web.StaticFileHandler),
+            (r"/charts/.*", ChartsHandler, dict(manager=store)),
+            (r"/.*", DefaultHandler, dict(manager=store)),
         ]
         settings = dict(
             template_path=os.path.join(os.path.dirname(__file__), "html"),

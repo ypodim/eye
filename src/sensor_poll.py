@@ -6,6 +6,7 @@ import json
 import os
 import glob
 import random
+import datetime
 # import aiofiles
 
 # import busio
@@ -66,8 +67,13 @@ class Sensor(object):
         self.instant_values_sum = 0
         self.instant_values_tot = 0
         self.last_datapoint = 0
-        self.store = []
-        self.datapoint_interval = 2 #seconds
+        self.store = dict(minutes=[], hours=[])
+        self.datapoint_interval = 60 #seconds
+
+        self.minutes = 60*24 # last 24h in minutes
+        self.hours = 24*365 # 1 year in hours
+        self.minutes_buffer = []
+
     async def get_measurement(self):
         raise NotImplementedError
     async def update(self):
@@ -81,14 +87,28 @@ class Sensor(object):
                 value = self.instant_values_sum/self.instant_values_tot
                 self.instant_values_sum = 0
                 self.instant_values_tot = 0
-                self.store.append((now, value))
+
+                self.store["minutes"].append((now, value))
+                if len(self.store["minutes"]) > self.minutes:
+                    del self.store["minutes"][0]
+
+                self.minutes_buffer.append(value)
+                if len(self.minutes_buffer) >= 60:
+                    hour_average = sum(self.minutes_buffer) / len(self.minutes_buffer)
+                    self.store["hours"].append((now, hour_average))
+                    self.minutes_buffer = []
+
+                    if len(self.store["hours"]) > self.hours:
+                        del self.store["hours"][0]
+
+
             self.last_datapoint = now
 
         await asyncio.sleep(0.001)
         future = asyncio.create_task(self.update())
     def get_stats(self):
         stats = {}
-        stats["store_size"] = len(self.store)
+        stats["store_size"] = len(self.store["minutes"])
         stats["inst_total"] = self.instant_values_tot
         stats["inst_sum"] = self.instant_values_sum
         return stats
@@ -194,9 +214,15 @@ class TestSensor(Sensor):
     async def get_measurement(self):
         self.instant_value = random.random() * 100
 
+
+def date_cmp(pair, threshold):
+    date = pair[0]
+    return time.time() - date < threshold
+
 class Manager(object):
     def __init__(self, sensors):
         self.sensors = sensors
+        self.retain_threshold = 60*60*24 #seconds
         # self.feeder = Feeder(actions_clb=self.action)
         # self.buffer = []
     def action(self, action_name, action_value):
@@ -206,15 +232,16 @@ class Manager(object):
     def get_data(self, sensor_name):
         for sensor in self.sensors:
             if sensor.name == sensor_name:
-                print("found it")
-                return sensor.store
+                return list(filter(
+                    lambda datalist: date_cmp(datalist, self.retain_threshold), 
+                    sensor.store["minutes"]))
         return (0,0)
 
     async def send(self):
         for s in self.sensors:
             data = dict(
                 sensor_name=s.name, 
-                sensor_value=s.get(), 
+                sensor_value=s.store["minutes"][-1][1], 
                 sensor_stats=s.get_stats(),
                 tstamp=time.time())
             # self.buffer.append(data)
@@ -235,7 +262,7 @@ class Manager(object):
         #             tstamp=time.time())
         #         self.buffer.append(data)
 
-        await asyncio.sleep(1)
+        await asyncio.sleep(5)
 
         future = asyncio.create_task(self.send())
 
