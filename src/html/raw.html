@@ -3,7 +3,11 @@
 <meta charset="UTF-8" />
 <script src="/static/jquery.min.js"></script>
 <script>
+<<<<<<< HEAD
 var ws = new WebSocket("ws://localhost:8888/ws");
+=======
+var ws = new WebSocket("ws://"+location.host+"/ws");
+>>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 ws.onopen = function() {
    // ws.send("Hello, world");
 };
@@ -32,7 +36,11 @@ $(document).ready(function() {
 
 <style>
 .chart { width: 500px; height: 400px; }
+<<<<<<< HEAD
 .sensor { margin: 10px; }
+=======
+.sensor { margin: 10px; flow:horizontal; display:inline-block; }
+>>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 </style></head>
 <body>
 <div id="chart">

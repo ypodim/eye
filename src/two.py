@@ -190,7 +190,7 @@ class Manager(object):
 
         if len(self.buffer) > 10:
             datastr = json.dumps(self.buffer)
-            url = "http://localhost:8888/data/"
+            url = "http://astrapi:8888/data/"
             try:
                 requests.put(url, params=dict(datastr=datastr))
                 self.buffer = []

@@ -6,7 +6,7 @@ data.json
 nohup.out
 # C extensions
 *.so
-
+*.json
 # Distribution / packaging
 .Python
 build/

@@ -4,6 +4,7 @@ import asyncio
 import tornado.ioloop
 import tornado.web
 import tornado.options
+<<<<<<< HEAD
 import tornado.log
 import tornado.locks
 import tornado.websocket
@@ -99,11 +100,26 @@ class ActionHandler(tornado.web.RequestHandler):
         self.write(dict(result="ok", actions=self.store.getActions(clear=False)))
     def get(self):
         self.write(dict(actions=self.store.getActions(clear=False)))
+=======
+import tornado.websocket
+import os
+
+class ActionHandler(tornado.web.RequestHandler):
+    def initialize(self, manager):
+        self.manager = manager
+    def put(self):
+        action = self.get_argument("action")
+        self.manager.addAction(action)
+        self.write(dict(result="ok", actions=self.manager.getActions(clear=False)))
+    def get(self):
+        self.write(dict(actions=self.manager.getActions(clear=False)))
+>>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 
 class ChartsHandler(tornado.web.RequestHandler):
     def initialize(self, manager):
         self.manager = manager
     def get(self):
+<<<<<<< HEAD
         chartName = self.request.uri.split("/")[-1]
 
         charts = {}
@@ -119,21 +135,47 @@ class ChartsHandler(tornado.web.RequestHandler):
         self.set_header('Content-Type', 'application/xhtml+xml')
         self.write(charts[chartName])
 
+=======
+        x_format = "%I:%M %p %Z"
+        datetimeline = pygal.DateTimeLine(
+            x_label_rotation=35, truncate_label=-1,
+            x_value_formatter=lambda dt: dt.strftime(x_format))
+
+        for sensor_name in self.manager.get_sensor_names():
+            data = self.manager.get_data(sensor_name)
+            datetimeline.add(sensor_name, data)
+        self.set_header('Content-Type', 'application/xhtml+xml')
+        self.write(datetimeline.render())
+>>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 
 class DefaultHandler(tornado.web.RequestHandler):
     def initialize(self, manager):
         self.manager = manager
     def get(self):
+<<<<<<< HEAD
         self.render("raw.html")
 
 class StatsSocket(tornado.websocket.WebSocketHandler):
     clients = set()
 
+=======
+        self.render("index.html")
+
+class StatsSocket(tornado.websocket.WebSocketHandler):
+    clients = set()
+    def initialize(self, manager):
+        self.manager = manager
+>>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
     def open(self):
         StatsSocket.clients.add(self)
 
     def on_message(self, message):
+<<<<<<< HEAD
         self.write_message(u"You said: " + message)
+=======
+        # self.write_message(u"You said: " + message)
+        self.manager.send()
+>>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 
     def on_close(self):
         StatsSocket.clients.remove(self)
@@ -146,6 +188,7 @@ class StatsSocket(tornado.websocket.WebSocketHandler):
 
 
 class Application(tornado.web.Application):
+<<<<<<< HEAD
     def __init__(self, store):
         handlers = [
             (r"/ws", StatsSocket),
@@ -155,6 +198,17 @@ class Application(tornado.web.Application):
             (r'/static/', tornado.web.StaticFileHandler),
             (r"/charts/.*", ChartsHandler, dict(manager=store)),
             (r"/.*", DefaultHandler, dict(manager=store)),
+=======
+    def __init__(self, manager):
+        handlers = [
+            (r"/ws", StatsSocket, dict(manager=manager)),
+            # (r"/data/.*", DataHandler, dict(store=store)),
+            (r"/actions", ActionHandler, dict(manager=manager)),
+            (r'/favicon.ico', tornado.web.StaticFileHandler),
+            (r'/static/', tornado.web.StaticFileHandler),
+            (r"/charts/.*", ChartsHandler, dict(manager=manager)),
+            (r"/.*", DefaultHandler, dict(manager=manager)),
+>>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
         ]
         settings = dict(
             template_path=os.path.join(os.path.dirname(__file__), "html"),
