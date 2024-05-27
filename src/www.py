@@ -39,6 +39,11 @@ class Store():
         actions = self.actions
         if clear: self.actions = []
         return actions
+    def save_to_file(self, filename="data.json"):
+        with open(self.filename, "w+") as f:
+            f.write(json.dumps(self.store))
+            self.store = {}
+            self.store_entries = 0
     def add(self, sensor_name, sensor_value, tstamp):
         
         '''
@@ -58,10 +63,7 @@ class Store():
 
         if self.store_entries > 24*3600:
             self.logger.info("24h window")
-            with open(self.filename, "w+") as f:
-                f.write(json.dumps(self.store))
-                self.store = {}
-                self.store_entries = 0
+            self.save_to_file()
 
     def get(self):
         return dict(data=self.store, 
