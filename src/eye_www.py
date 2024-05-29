@@ -43,6 +43,14 @@ class DefaultHandler(tornado.web.RequestHandler):
     def get(self):
         self.render("index.html")
 
+class DataHandler(tornado.web.RequestHandler):
+    def initialize(self, manager):
+        self.manager = manager
+    def get(self):
+        self.write("ok")
+    def post(self):
+        pass
+
 class StatsSocket(tornado.websocket.WebSocketHandler):
     clients = set()
     def initialize(self, manager):
@@ -70,7 +78,7 @@ class Application(tornado.web.Application):
     def __init__(self, manager):
         handlers = [
             (r"/ws", StatsSocket, dict(manager=manager)),
-            # (r"/data/.*", DataHandler, dict(store=store)),
+            (r"/data/.*", DataHandler, dict(manager=manager)),
             (r"/actions", ActionHandler, dict(manager=manager)),
             (r'/favicon.ico', tornado.web.StaticFileHandler),
             (r'/static/', tornado.web.StaticFileHandler),
