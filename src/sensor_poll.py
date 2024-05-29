@@ -7,32 +7,6 @@ import os
 import glob
 import random
 import datetime
-<<<<<<< HEAD
-# import aiofiles
-
-# import busio
-# import board
-# import digitalio
-# import adafruit_rfm9x
-# import adafruit_mcp9808
-# import digitalio
-# import pwmio
-import logging
-from tornado.options import define, options
-
-# import adafruit_ads7830.ads7830 as ADC
-# from adafruit_ads7830.analog_in import AnalogIn
-# from adafruit_onewire.bus import OneWireBus
-# from adafruit_ds18x20 import DS18X20
-# from adafruit_seesaw.seesaw import Seesaw
-from www_server import Application, StatsSocket
-
-# cs = digitalio.DigitalInOut(board.D22)
-# set_pin = digitalio.DigitalInOut(board.D22)
-# set_pin.direction = digitalio.Direction.OUTPUT
-# unset_pin = digitalio.DigitalInOut(board.D27)
-# unset_pin.direction = digitalio.Direction.OUTPUT
-=======
 import aiofiles
 
 import busio
@@ -58,7 +32,6 @@ set_pin = digitalio.DigitalInOut(board.D22)
 set_pin.direction = digitalio.Direction.OUTPUT
 unset_pin = digitalio.DigitalInOut(board.D27)
 unset_pin.direction = digitalio.Direction.OUTPUT
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 
 
 # os.system("play /usr/share/sounds/alsa/Noise.wav")
@@ -88,10 +61,6 @@ class Relay():
         else:
             self.set_on()
 
-<<<<<<< HEAD
-class Sensor(object):
-    def __init__(self, name=""):
-=======
 
 class Store(object):
     def __init__(self):
@@ -132,26 +101,15 @@ class Store(object):
 class Sensor(Store):
     def __init__(self, name=""):
         Store.__init__(self)
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
         self.name = name
         self.instant_value = 0
         self.instant_values_sum = 0
         self.instant_values_tot = 0
         self.last_datapoint = 0
-<<<<<<< HEAD
-        self.store = dict(minutes=[], hours=[])
-        self.datapoint_interval = 60 #seconds
-
-        self.minutes = 60*24 # last 24h in minutes
-        self.hours = 24*365 # 1 year in hours
-        self.minutes_buffer = []
-
-=======
         self.datapoint_interval = 60 #seconds
         self.filename = "%s.json" % name
         self.load(self.filename)
     
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
     async def get_measurement(self):
         raise NotImplementedError
     async def update(self):
@@ -166,42 +124,11 @@ class Sensor(Store):
                 self.instant_values_sum = 0
                 self.instant_values_tot = 0
 
-<<<<<<< HEAD
-                self.store["minutes"].append((now, value))
-                if len(self.store["minutes"]) > self.minutes:
-                    del self.store["minutes"][0]
-
-                self.minutes_buffer.append(value)
-                if len(self.minutes_buffer) >= 60:
-                    hour_average = sum(self.minutes_buffer) / len(self.minutes_buffer)
-                    self.store["hours"].append((now, hour_average))
-                    self.minutes_buffer = []
-
-                    if len(self.store["hours"]) > self.hours:
-                        del self.store["hours"][0]
-
-
-=======
             self.insert(value)
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
             self.last_datapoint = now
 
         await asyncio.sleep(0.001)
         future = asyncio.create_task(self.update())
-<<<<<<< HEAD
-    def get_stats(self):
-        stats = {}
-        stats["store_size"] = len(self.store["minutes"])
-        stats["inst_total"] = self.instant_values_tot
-        stats["inst_sum"] = self.instant_values_sum
-        return stats
-    def get(self):
-        if self.store:
-            return int(1000*self.store[-1][0])/1000
-        else:
-            return None
-=======
-
 
     def get_stats(self):
         stats = {}
@@ -209,12 +136,6 @@ class Sensor(Store):
         stats["inst_total"] = self.instant_values_tot
         stats["inst_sum"] = self.instant_values_sum
         return stats
-    # def get(self):
-    #     if self.store:
-    #         return int(1000*self.store[-1][0])/1000
-    #     else:
-    #         return None
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 
 class Temperature(Sensor):
     def __init__(self):
@@ -260,22 +181,13 @@ class Temperature(Sensor):
             self.instant_value = temp_f
             # self.instant_values_tot += 1
 
-<<<<<<< HEAD
-        # future = asyncio.create_task(self.update())
-
-=======
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 class Light(Sensor):
     def __init__(self, adc, pin):
         super(Light, self).__init__(name="light")
         self.pin = AnalogIn(adc, pin)
     async def get_measurement(self):
-<<<<<<< HEAD
-        self.instant_value = self.pin.value
-=======
         max_value = 65536
         self.instant_value = 100*self.pin.value/max_value
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 
 class Microphone(Sensor):
     def __init__(self, mcp, pin):
@@ -284,11 +196,7 @@ class Microphone(Sensor):
         self.past_values = []
         self.past_values_size = 10
     async def get_measurement(self):
-<<<<<<< HEAD
-        val = self.pin.value/65536
-=======
         val = 100.0*self.pin.value/65536
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
         self.past_values.append(val)
         if len(self.past_values) > self.past_values_size:
             del self.past_values[0]
@@ -328,10 +236,7 @@ class TestSensor(Sensor):
 def date_cmp(pair, threshold):
     date = pair[0]
     return time.time() - date < threshold
-<<<<<<< HEAD
-=======
     # return datetime.datetime.now() - date < datetime.timedelta(seconds=threshold)
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 
 class Manager(object):
     def __init__(self, sensors):
@@ -346,21 +251,6 @@ class Manager(object):
     def get_data(self, sensor_name):
         for sensor in self.sensors:
             if sensor.name == sensor_name:
-<<<<<<< HEAD
-                return list(filter(
-                    lambda datalist: date_cmp(datalist, self.retain_threshold), 
-                    sensor.store["minutes"]))
-        return (0,0)
-
-    async def send(self):
-        for s in self.sensors:
-            data = dict(
-                sensor_name=s.name, 
-                sensor_value=s.store["minutes"][-1][1], 
-                sensor_stats=s.get_stats(),
-                tstamp=time.time())
-            # self.buffer.append(data)
-=======
                 func = lambda datalist: date_cmp(datalist, self.retain_threshold)
                 date_tranform = lambda x: (datetime.datetime.fromtimestamp(x[0]), x[1])
                 result = list(filter(func, sensor.get_minutes()))
@@ -384,7 +274,6 @@ class Manager(object):
                 sensor_value=s.get_last_value(), 
                 sensor_stats=s.get_stats(),
                 tstamp=time.time())
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
             StatsSocket.send_message(data)
 
         # if len(self.buffer) > 10:
@@ -402,34 +291,12 @@ class Manager(object):
         #             tstamp=time.time())
         #         self.buffer.append(data)
 
-<<<<<<< HEAD
-        await asyncio.sleep(5)
-
-        future = asyncio.create_task(self.send())
-
-
-=======
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 async def main(i2c):
     
     LIGHT_PIN = 0
     MIC_PIN = 1
     sensors = []
 
-<<<<<<< HEAD
-    # adc = ADC.ADS7830(i2c)
-    # light = Light(adc, LIGHT_PIN)
-    # await light.update()
-    # sensors.append(light)
-
-    # mic = Microphone(adc, MIC_PIN)
-    # await mic.update()
-    # sensors.append(mic)
-
-    # internalTemp = InternalTemperature(i2c)
-    # await internalTemp.update()
-    # sensors.append(internalTemp)
-=======
     adc = ADC.ADS7830(i2c)
     light = Light(adc, LIGHT_PIN)
     await light.update()
@@ -442,24 +309,11 @@ async def main(i2c):
     internalTemp = InternalTemperature(i2c)
     await internalTemp.update()
     sensors.append(internalTemp)
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 
     # soil_conductivity = SoilConductivity()
     # await soil_conductivity.update()
     # sensors.append(soil_conductivity)
 
-<<<<<<< HEAD
-    # temp = Temperature()
-    # await temp.update()
-    # sensors.append(temp)
-
-    sensor = TestSensor()
-    await sensor.update()
-    sensors.append(sensor)
-
-    manager = Manager(sensors)
-    await manager.send()
-=======
     temp = Temperature()
     await temp.update()
     sensors.append(temp)
@@ -474,65 +328,36 @@ async def main(i2c):
 
     ipmanager = IPmanager()
     asyncio.get_event_loop().call_later(60, ipmanager.checkin)
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 
     tornado.options.parse_command_line()
     tornado.log.enable_pretty_logging()
 
-<<<<<<< HEAD
-    # store = Store()
-    # await store.load_from_local_file()
-    
-=======
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
     app = Application(manager)
     logger = logging.getLogger("tornado.access")
     # logger.propagate = False
 
     io_loop = tornado.ioloop.IOLoop.current()
-<<<<<<< HEAD
-    # pc = tornado.ioloop.PeriodicCallback(brain.periodic, 1000)
-    # pc.start()
-    app.listen(options.port)
-
-=======
     app.listen(options.port)
     
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
     shutdown_event = asyncio.Event()
     await shutdown_event.wait()
     
 
 
 if __name__ == "__main__":
-<<<<<<< HEAD
-    # try:
-    #     with board.I2C() as i2c:
-    #         asyncio.run(main(i2c))
-    # except KeyboardInterrupt:
-    #     print("time to die")
-
-
-    try:
-        asyncio.run(main(None))
-=======
     try:
         with board.I2C() as i2c:
             asyncio.run(main(i2c))
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
     except KeyboardInterrupt:
         print("time to die")
 
 
-<<<<<<< HEAD
-=======
     # try:
     #     asyncio.run(main(None))
     # except KeyboardInterrupt:
     #     print("time to die")
 
 
->>>>>>> 2a19435aeeab7c9029c782f4fc456b65e48780ba
 
 
 

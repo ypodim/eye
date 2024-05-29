@@ -1,9 +1,16 @@
 import pygal 
+import asyncio
 import tornado.ioloop
 import tornado.web
 import tornado.options
 import tornado.websocket
 import os
+
+class Manager(object):
+    def __init__(self):
+        pass
+
+
 
 class ActionHandler(tornado.web.RequestHandler):
     def initialize(self, manager):
@@ -24,9 +31,9 @@ class ChartsHandler(tornado.web.RequestHandler):
             x_label_rotation=35, truncate_label=-1,
             x_value_formatter=lambda dt: dt.strftime(x_format))
 
-        for sensor_name in self.manager.get_sensor_names():
-            data = self.manager.get_data(sensor_name)
-            datetimeline.add(sensor_name, data)
+        # for sensor_name in self.manager.get_sensor_names():
+        #     data = self.manager.get_data(sensor_name)
+        #     datetimeline.add(sensor_name, data)
         self.set_header('Content-Type', 'application/xhtml+xml')
         self.write(datetimeline.render())
 
@@ -46,7 +53,8 @@ class StatsSocket(tornado.websocket.WebSocketHandler):
 
     def on_message(self, message):
         # self.write_message(u"You said: " + message)
-        self.manager.send()
+        print("got", message)
+        # self.manager.send()
 
     def on_close(self):
         StatsSocket.clients.remove(self)
@@ -79,5 +87,16 @@ class Application(tornado.web.Application):
         )
         super(Application, self).__init__(handlers, **settings)
 
+async def main():
+    app = Application(Manager())
+    app.listen(8888)
+    shutdown_event = asyncio.Event()
+    await shutdown_event.wait()
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("exiting")
 
     
