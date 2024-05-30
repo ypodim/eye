@@ -21,7 +21,6 @@ from adafruit_ads7830.analog_in import AnalogIn
 from adafruit_onewire.bus import OneWireBus
 from adafruit_ds18x20 import DS18X20
 from adafruit_seesaw.seesaw import Seesaw
-from ip import IPmanager
 
 cs = digitalio.DigitalInOut(board.D22)
 set_pin = digitalio.DigitalInOut(board.D22)
@@ -129,7 +128,33 @@ class Sensor(Store):
         stats["inst_total"] = self.instant_values_tot
         stats["inst_sum"] = self.instant_values_sum
         return stats
+        
+    def send(self):
+        for s in self.sensors:
+            data = dict(
+                sensor_name=s.name, 
+                sensor_value=s.get_last_value(), 
+                sensor_stats=s.get_stats(),
+                tstamp=time.time())
+            self.buffer.append(data)
 
+        if len(self.buffer) > 10:
+            datastr = json.dumps(self.buffer)
+            url = "http://astrapi:8888/data/"
+            try:
+                requests.put(url, params=dict(datastr=datastr))
+                self.buffer = []
+                print("success!")
+            except:
+                print("error connecting")
+                data = dict(
+                    sensor_name="error_connecting", 
+                    sensor_value=1, 
+                    tstamp=time.time())
+                self.buffer.append(data)
+
+    def stop(self):
+        self.running = 0
 
 class Temperature(Sensor):
     def __init__(self):
@@ -140,8 +165,7 @@ class Temperature(Sensor):
         # Get all the filenames begin with 28 in the path base_dir.
         self.device_folder = glob.glob(base_dir + '28*')[0]
         self.running = 1
-    def stop(self):
-        self.running = 0
+    
     def run(self):
         while self.running:
             val = self.read_temp_raw()
@@ -226,11 +250,13 @@ def date_cmp(pair, threshold):
     # return datetime.datetime.now() - date < datetime.timedelta(seconds=threshold)
 
 class Manager(object):
-    def __init__(self, sensors):
-        self.sensors = sensors
+    def __init__(self):
+        self.sensors = []
         self.retain_threshold = 60*60*24 #seconds
         # self.feeder = Feeder(actions_clb=self.action)
         # self.buffer = []
+    def set_sensors(self, sensors):
+        self.sensors = sensors
     def action(self, action_name, action_value):
         print("action:", action_name, action_value)
     def get_sensor_names(self):
@@ -245,102 +271,61 @@ class Manager(object):
                 return result
         return (0,0)
 
-    def loop(self):
-        self.send()
-        # asyncio.get_event_loop().call_later(3, self.loop)
-
     def save_to_file(self):
         for sensor in self.sensors:
             sensor.save(sensor.filename)
         # asyncio.get_event_loop().call_later(30, self.save_to_file)
 
-    def send(self):
+    def stop(self):
         for s in self.sensors:
-            data = dict(
-                sensor_name=s.name, 
-                sensor_value=s.get_last_value(), 
-                sensor_stats=s.get_stats(),
-                tstamp=time.time())
-            StatsSocket.send_message(data)
+            s.stop()
 
-        # if len(self.buffer) > 10:
-        #     datastr = json.dumps(self.buffer)
-        #     url = "http://astrapi:8888/data/"
-        #     try:
-        #         requests.put(url, params=dict(datastr=datastr))
-        #         self.buffer = []
-        #         print("success!")
-        #     except:
-        #         print("error connecting")
-        #         data = dict(
-        #             sensor_name="error_connecting", 
-        #             sensor_value=1, 
-        #             tstamp=time.time())
-        #         self.buffer.append(data)
-
-def main(i2c):
-    
-    LIGHT_PIN = 0
-    MIC_PIN = 1
-    sensors = []
-
-    adc = ADC.ADS7830(i2c)
-    light = Light(adc, LIGHT_PIN)
-    light.update()
-    sensors.append(light)
-
-    mic = Microphone(adc, MIC_PIN)
-    mic.update()
-    sensors.append(mic)
-
-    internalTemp = InternalTemperature(i2c)
-    internalTemp.update()
-    sensors.append(internalTemp)
-
-    # soil_conductivity = SoilConductivity()
-    # await soil_conductivity.update()
-    # sensors.append(soil_conductivity)
-
-    temp = Temperature()
-    temp.update()
-    sensors.append(temp)
-
-    # sensor = TestSensor()
-    # await sensor.update()
-    # sensors.append(sensor)
-
-    manager = Manager(sensors)
-    manager.loop()
-    # asyncio.get_event_loop().call_later(30, manager.save_to_file)
-
-    ipmanager = IPmanager()
-    # asyncio.get_event_loop().call_later(60, ipmanager.checkin)
 
 
 if __name__ == "__main__":
-    # try:
-    #     with board.I2C() as i2c:
-    #         main(i2c)
-    # except KeyboardInterrupt:
-    #     print("time to die")
-
-    temp_sensor = Temperature()
-    x = threading.Thread(target=temp_sensor.run)
-    x.start()
-
-
+    manager = Manager()
     try:
-        while 1:
-            pass
+        with board.I2C() as i2c:
+            LIGHT_PIN = 0
+            MIC_PIN = 1
+            sensors = []
+
+            # adc = ADC.ADS7830(i2c)
+            # light = Light(adc, LIGHT_PIN)
+            # light.update()
+            # sensors.append(light)
+
+            # mic = Microphone(adc, MIC_PIN)
+            # mic.update()
+            # sensors.append(mic)
+
+            # internalTemp = InternalTemperature(i2c)
+            # internalTemp.update()
+            # sensors.append(internalTemp)
+
+            # soil_conductivity = SoilConductivity()
+            # await soil_conductivity.update()
+            # sensors.append(soil_conductivity)
+
+            # temp = Temperature()
+            # temp.update()
+            # sensors.append(temp)
+            temperature = Temperature()
+            x = threading.Thread(target=temperature.run)
+            x.start()
+            sensors.append(temperature)
+
+            # sensor = TestSensor()
+            # await sensor.update()
+            # sensors.append(sensor)
+            manager.set_sensors(sensors)
+            
+            while 1:
+                time.sleep(1)
+
     except KeyboardInterrupt:
         print("time to die")
-        temp_sensor.stop()
-
-
-
-
-
-
+        manager.stop()
 
 
 
