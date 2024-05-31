@@ -11,7 +11,6 @@ import threading
 import busio
 import board
 import digitalio
-import adafruit_rfm9x
 import adafruit_mcp9808
 import digitalio
 import pwmio
@@ -129,30 +128,33 @@ class Sensor(Store):
         stats["inst_sum"] = self.instant_values_sum
         return stats
         
-    def send(self):
-        for s in self.sensors:
+    def send(self, sensor_name, sensor_value):
+        print(sensor_name, sensor_value)
+        return
+        data = dict(
+            sensor_name=sensor_name, 
+            sensor_value=sensor_value, 
+            # sensor_stats=s.get_stats(),
+            tstamp=time.time())
+
+        datastr = json.dumps(data)
+        url = "http://astrapi:8888/data/"
+        try:
+            requests.put(url, params=dict(datastr=datastr))
+            print("success!")
+        except:
+            print("error connecting")
             data = dict(
-                sensor_name=s.name, 
-                sensor_value=s.get_last_value(), 
-                sensor_stats=s.get_stats(),
+                sensor_name="error_connecting", 
+                sensor_value=1, 
                 tstamp=time.time())
-            self.buffer.append(data)
-
-        if len(self.buffer) > 10:
-            datastr = json.dumps(self.buffer)
-            url = "http://astrapi:8888/data/"
-            try:
-                requests.put(url, params=dict(datastr=datastr))
-                self.buffer = []
-                print("success!")
-            except:
-                print("error connecting")
-                data = dict(
-                    sensor_name="error_connecting", 
-                    sensor_value=1, 
-                    tstamp=time.time())
-                self.buffer.append(data)
-
+         
+    def run(self):
+        self.running = 1
+        while self.running:
+            val = self.read_value()
+            self.send(self.name, val)
+            time.sleep(1)
     def stop(self):
         self.running = 0
 
@@ -164,15 +166,8 @@ class Temperature(Sensor):
         base_dir = '/sys/bus/w1/devices/'
         # Get all the filenames begin with 28 in the path base_dir.
         self.device_folder = glob.glob(base_dir + '28*')[0]
-        self.running = 1
     
-    def run(self):
-        while self.running:
-            val = self.read_temp_raw()
-            print(val)
-            time.sleep(1)
-
-    def read_temp_raw(self):
+    def read_value(self):
         device_file = self.device_folder + '/w1_slave'
         f = open(device_file, 'r')
         lines = f.readlines()
@@ -196,9 +191,13 @@ class Light(Sensor):
     def __init__(self, adc, pin):
         super(Light, self).__init__(name="light")
         self.pin = AnalogIn(adc, pin)
-    def get_measurement(self):
+    def read_value(self):
         max_value = 65536
-        self.instant_value = 100*self.pin.value/max_value
+        # self.instant_value = 100*self.pin.value/max_value
+        self.instant_value = self.pin.value
+        # self.send("light2", self.pin.value)
+        return self.pin.value
+
 
 class Microphone(Sensor):
     def __init__(self, mcp, pin):
@@ -218,7 +217,7 @@ class SoilConductivity(Sensor):
         super(SoilConductivity, self).__init__(name="soil_moisture")
         i2c_bus = board.I2C()
         self.pin = Seesaw(i2c_bus, addr=0x36)
-    def get_measurement(self):
+    def read_value(self):
         try:
             soil_conduct = self.pin.moisture_read()
             soil_temp = 32 + self.pin.get_temp() * 9 / 5
@@ -227,6 +226,8 @@ class SoilConductivity(Sensor):
             soil_conduct = None
             soil_temp = None
             self.error = "error reading I2C from soil sensor" 
+
+        return soil_conduct
 
 class InternalTemperature(Sensor):
     def __init__(self, i2c):
@@ -287,13 +288,19 @@ if __name__ == "__main__":
     try:
         with board.I2C() as i2c:
             LIGHT_PIN = 0
+            LIGHT_PIN2 = 2
             MIC_PIN = 1
             sensors = []
 
-            # adc = ADC.ADS7830(i2c)
+            adc = ADC.ADS7830(i2c)
+
             # light = Light(adc, LIGHT_PIN)
             # light.update()
             # sensors.append(light)
+
+            light2 = Light(adc, LIGHT_PIN2)
+            threading.Thread(target=light2.run).start()
+            sensors.append(light2)
 
             # mic = Microphone(adc, MIC_PIN)
             # mic.update()
@@ -303,16 +310,15 @@ if __name__ == "__main__":
             # internalTemp.update()
             # sensors.append(internalTemp)
 
-            # soil_conductivity = SoilConductivity()
-            # await soil_conductivity.update()
-            # sensors.append(soil_conductivity)
+            soil_conductivity = SoilConductivity()
+            threading.Thread(target=soil_conductivity.run).start()
+            sensors.append(soil_conductivity)
 
             # temp = Temperature()
             # temp.update()
             # sensors.append(temp)
             temperature = Temperature()
-            x = threading.Thread(target=temperature.run)
-            x.start()
+            threading.Thread(target=temperature.run).start()
             sensors.append(temperature)
 
             # sensor = TestSensor()
