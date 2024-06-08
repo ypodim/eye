@@ -5,12 +5,10 @@ import json
 import os
 import glob
 import random
-import datetime
 import threading
 
 import busio
 import board
-import digitalio
 import adafruit_mcp9808
 import digitalio
 import pwmio
@@ -224,9 +222,9 @@ class Manager(object):
         threading.Thread(target=mic.run).start()
         self.sensors.append(mic)
 
-        internalTemp = InternalTemperature(self.i2c)
-        threading.Thread(target=internalTemp.run).start()
-        self.sensors.append(internalTemp)
+        # internalTemp = InternalTemperature(self.i2c)
+        # threading.Thread(target=internalTemp.run).start()
+        # self.sensors.append(internalTemp)
 
         soil_conductivity = SoilConductivity()
         threading.Thread(target=soil_conductivity.run).start()

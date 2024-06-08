@@ -3,7 +3,7 @@
 <meta charset="UTF-8" />
 <script src="/static/jquery.min.js"></script>
 <style>
-.chart { width: 500px; height: 400px; }
+.chart { width: 1000px; height: 400px; }
 .sensor { margin: 10px; flow:horizontal; display:inline-block; }
 button { width: 100px; display:block; margin: 5px; }
 </style></head>
@@ -28,7 +28,7 @@ button { width: 100px; display:block; margin: 5px; }
    <button class="toggle" id="testSensor">testSensor</button>
 </div>
 
-<div id="debug"></div>
+<div id="debug">debug</div>
 
 <script>
 var ws = new WebSocket("ws://"+location.host+"/ws");
@@ -37,6 +37,9 @@ ws.onopen = function() {
 };
 ws.onmessage = function (evt) {
    $("#debug").append($("p").append("<strong>"+evt.data+"</strong>"));
+   console.log(evt);
+   return;
+   
    var data = JSON.parse(evt.data);
    id = "#"+data.sensor_name;
    
