@@ -203,13 +203,22 @@ class ChartsHandler(tornado.web.RequestHandler):
     def initialize(self, manager):
         self.manager = manager
     def get(self):
+        sensors_to_show = self.manager.get_sensor_names()
+        if self.request.arguments:
+            sensors_to_show = []
+            for sensor_name in self.request.arguments:
+                val = self.request.arguments.get(sensor_name)
+                val = val[0].decode("utf-8")
+                if val == "1":
+                    sensors_to_show.append(sensor_name)
+                
         x_format = "%I:%M %p %Z"
         datetimeline = pygal.DateTimeLine(
             x_label_rotation=35, truncate_label=-1,
             x_value_formatter=lambda dt: dt.strftime(x_format),
             width=1500)
 
-        for sensor_name in self.manager.get_sensor_names():
+        for sensor_name in sensors_to_show:
             data = self.manager.get_sensor_data(sensor_name)
             datetimeline.add(sensor_name, data)
         self.set_header('Content-Type', 'application/xhtml+xml')

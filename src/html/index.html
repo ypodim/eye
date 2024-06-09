@@ -3,29 +3,16 @@
 <meta charset="UTF-8" />
 <script src="/static/jquery.min.js"></script>
 <style>
-.chart { width: 1000px; height: 400px; }
+.chart { width: 100%; height: 400px; }
 .sensor { margin: 10px; flow:horizontal; display:inline-block; }
-button { width: 100px; display:block; margin: 5px; }
+button { width: 100px; margin: 5px; }
 </style></head>
 <body>
-<div id="chart">
-   <div class="sensor" id="internaltemp"></div>
-   <div class="sensor" id="soil_moisture"></div>
-   <div class="sensor" id="mic"></div>
-   <div class="sensor" id="light"></div>
-   <div class="sensor" id="temperature"></div>
-   <div class="sensor" id="testSensor"></div>
-</div>
 
 
 <embed class="chart" type="image/svg+xml" src="/charts/super" />
 <div id="controls">
-   <button class="toggle" id="internaltemp">internaltemp</button>
-   <button class="toggle" id="soil_moisture">soil_moisture</button>
-   <button class="toggle" id="mic">mic</button>
-   <button class="toggle" id="light">light</button>
-   <button class="toggle" id="temperature">temperature</button>
-   <button class="toggle" id="testSensor">testSensor</button>
+   
 </div>
 
 <div id="debug">debug</div>
@@ -37,7 +24,7 @@ ws.onopen = function() {
 };
 ws.onmessage = function (evt) {
    $("#debug").append($("p").append("<strong>"+evt.data+"</strong>"));
-   console.log(evt);
+   // console.log(evt);
    return;
    
    var data = JSON.parse(evt.data);
@@ -57,15 +44,44 @@ ws.onmessage = function (evt) {
 };
 
 $(document).ready(function() {  
-   
+   for (sname in sensors_available) {
+      var el = $('<div></div>');
+      var btn = $("<button></button>").addClass("toggle").attr("id",sname).text(sname).click(sensor_click);
+      var span = $("<span>on</span>").css("color","white").css("background", "green");
+
+      el.append(btn).append(span);
+      $("#controls").append(el);
+   }
 }); 
 
+var sensors_available = {"soil_moisture":1, "mic":1, "light":1, "temperature":1, "attic_thermo":1};
+var sensors_to_show = [];
+
 var embed = $("embed.chart");
-$(".toggle").on("click", function(){
-   console.log($(this).attr("id"));
+var sensor_click = function(){
+   var next = $(this).next();
+   if (typeof next.attr("state") == 'undefined' || next.attr("state") == "true") {
+      next.attr("state", "false");
+   } else {
+      next.attr("state", "true");
+   }
+   (next.attr("state") == "true") ? next.text("on") : next.text("");
+   (next.attr("state") == "true") ? next.css("background", "green") : next.css("background", "white");
+   sname = $(this).attr("id");
+   (next.attr("state") == "true") ? sensors_available[sname] = 1 : sensors_available[sname] = 0;
+
+   var query = "?";
+   for (sname in sensors_available) {
+      if (sensors_available[sname] == 1) {
+         query += sname+"=1&";
+      }
+   }
+   query = query.substring(0, query.length - 1)
+   var src = "/charts/super"+query;
+   // console.log(src)
+   embed.attr("src", src);
    
-   console.log(embed.attr("src"));
-})
+}
 </script>
 </body>
 </html>
