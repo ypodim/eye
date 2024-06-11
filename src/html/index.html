@@ -3,17 +3,22 @@
 <meta charset="UTF-8" />
 <script src="/static/jquery.min.js"></script>
 <style>
-.chart { width: 100%; height: 400px; }
+
 .sensor { margin: 10px; flow:horizontal; display:inline-block; }
+.nav { width: 150px; background-color: green; display: inline-block; }
+.chart { width: 100%; height: 400px; background-color: yellow; float: left; }
 button { width: 100px; margin: 5px; }
 </style></head>
 <body>
 
 
-<embed class="chart" type="image/svg+xml" src="/charts/super" />
-<div id="controls">
-   
+<div id="chart_container">
+   <div id="go_left" class="nav">previous</div>
+   <div class="nav chart"><embed type="image/svg+xml" src="/charts/super" /></div>
+   <div id="go_right" class="nav">next</div>
 </div>
+
+<div id="controls"></div>
 
 <div id="debug">debug</div>
 
@@ -30,9 +35,6 @@ ws.onmessage = function (evt) {
    var data = JSON.parse(evt.data);
    id = "#"+data.sensor_name;
    
-   // var embed = $("<embed />").addClass("chart").attr("type", "image/svg+xml");
-   // embed.attr("src", "/charts/"+data.sensor_name);
-
    var sensor_name = $("<div></div>").addClass("sensor_name").html(data.sensor_name);
    var sensor_value = $("<div></div>").addClass("sensor_value").html(data.sensor_value);
 
@@ -57,7 +59,7 @@ $(document).ready(function() {
 var sensors_available = {"soil_moisture":1, "mic":1, "light":1, "temperature":1, "attic_thermo":1};
 var sensors_to_show = [];
 
-var embed = $("embed.chart");
+var embed = $("embed");
 var sensor_click = function(){
    var next = $(this).next();
    if (typeof next.attr("state") == 'undefined' || next.attr("state") == "true") {

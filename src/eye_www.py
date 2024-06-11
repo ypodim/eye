@@ -10,33 +10,7 @@ import datetime
 
 import random
 
-def date_cmp(pair, threshold):
-    date = pair[0]
-    return time.time() - date < threshold
-    # return datetime.datetime.now() - date < datetime.timedelta(seconds=threshold)
 
-
-# class Manager(object):
-#     def __init__(self):
-#         self.sensors = []
-#         self.retain_threshold = 60*60*24 #seconds
-#     def set_sensors(self, sensors):
-#         self.sensors = sensors
-#     def action(self, action_name, action_value):
-#         print("action:", action_name, action_value)
-#     def get_data(self, sensor_name):
-#         for sensor in self.sensors:
-#             if sensor.name == sensor_name:
-#                 func = lambda datalist: date_cmp(datalist, self.retain_threshold)
-#                 date_tranform = lambda x: (datetime.datetime.fromtimestamp(x[0]), x[1])
-#                 result = list(filter(func, sensor.get_minutes()))
-#                 result = list(map(date_tranform, result))
-#                 return result
-#         return (0,0)
-
-#     def stop(self):
-#         for s in self.sensors:
-#             s.stop()
 
 class StatUnit:
     def __init__(self, stat_json=None):
@@ -82,7 +56,7 @@ class Store(object):
                 while line:
                     count += 1
                     entry = line.strip().split(" ")
-                    print("read line:", entry)
+                    # print("read line:", entry)
                     year, month, day, hour, minute, sensor_value = entry
                     now = datetime.datetime(
                         year=int(year), 
@@ -109,7 +83,16 @@ class Store(object):
                 f.write(raw_str)
             self.buffer = []
 
+    # def is_valid(self, sensor_value):
+    #     if self.name in ["attic_therm", "temperature"]:
+    #         print(type(sensor_value))
+    #     if sensor_value < 10:
+    #         return False
+    #     return True
     def insert(self, sensor_value, now=None):
+        # if not self.is_valid(sensor_value):
+        #     return None
+
         now = now or datetime.datetime.now()
         if now.year not in self._store: 
             self._store[now.year] = {}
@@ -133,18 +116,22 @@ class Store(object):
         for hour in range(24):
             for minute in range(60):
                 value = 0
-                if hour in self._store[now.year][now.month][now.day]:
-                    if minute in self._store[now.year][now.month][now.day][hour]:
+                if now.year in self._store and \
+                    now.month in self._store[now.year] and \
+                    now.day in self._store[now.year][now.month] and \
+                    hour in self._store[now.year][now.month][now.day] and \
+                    minute in self._store[now.year][now.month][now.day][hour]:
                         value = self._store[now.year][now.month][now.day][hour][minute]
                         max_value = max(max_value, value)
-                x = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-                ret_list.append([x, value])
+                
+                        x = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                        ret_list.append([x, value])
 
         if max_value > 100:
             for i, items in enumerate(ret_list):
                 ret_list[i] = [items[0], 100*items[1]/max_value]
              
-        return ret_list
+        return ret_list, now
 
 class Manager:
     def __init__(self):
@@ -170,7 +157,8 @@ class Manager:
             output = " ".join([name for name in self.get_sensor_names()])
             f.write(output)
 
-    def insert(self, sensor_name, sensor_value):
+    
+    def insert(self, sensor_name, sensor_value):    
         if sensor_name not in self.sensors:
             self.sensors[sensor_name] = Store(sensor_name)
             self.save_sensor_names()
@@ -219,8 +207,9 @@ class ChartsHandler(tornado.web.RequestHandler):
             width=1500)
 
         for sensor_name in sensors_to_show:
-            data = self.manager.get_sensor_data(sensor_name)
+            data, dtime = self.manager.get_sensor_data(sensor_name)
             datetimeline.add(sensor_name, data)
+        datetimeline.config.title = "%s" % dtime
         self.set_header('Content-Type', 'application/xhtml+xml')
         self.write(datetimeline.render())
 
