@@ -209,18 +209,17 @@ class Manager(object):
         self.actuators = dict(relay=Relay(set_pin, unset_pin))
     def setup(self):
         LIGHT_PIN = 0
-        LIGHT_PIN2 = 2
         MIC_PIN = 1
 
         adc = ADC.ADS7830(self.i2c)
 
-        light2 = Light(adc, LIGHT_PIN2)
+        light2 = Light(adc, LIGHT_PIN)
         threading.Thread(target=light2.run).start()
         self.sensors.append(light2)
 
-        mic = Microphone(adc, MIC_PIN)
-        threading.Thread(target=mic.run).start()
-        self.sensors.append(mic)
+        # mic = Microphone(adc, MIC_PIN)
+        # threading.Thread(target=mic.run).start()
+        # self.sensors.append(mic)
 
         # internalTemp = InternalTemperature(self.i2c)
         # threading.Thread(target=internalTemp.run).start()
