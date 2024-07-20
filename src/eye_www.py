@@ -231,8 +231,10 @@ class DefaultHandler(tornado.web.RequestHandler):
     def initialize(self, manager):
         self.manager = manager
     def get(self):
-        self.render("index.html")
+        print("ok")
         self.manager.addAction("get_stats", 0)
+        self.render("index.html")
+        
 
 class DataHandler(tornado.web.RequestHandler):
     def initialize(self, manager):
