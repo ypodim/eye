@@ -27,7 +27,17 @@ unset_pin.direction = digitalio.Direction.OUTPUT
 
 
 # os.system("play /usr/share/sounds/alsa/Noise.wav")
-options = dict(url="http://astrapi:8888/data/")
+class Urls:
+    base="http://astrapi:8888"
+    data="/data/"
+    status="/status"
+
+    @staticmethod
+    def data_url():
+        return Urls.base+Urls.data
+    @staticmethod
+    def status_url():
+        return Urls.base+Urls.status
 
 class Relay():
     def __init__(self, set_pin, unset_pin, name="relay"):
@@ -78,7 +88,7 @@ class Sensor(object):
 
         datastr = json.dumps(data)
         try:
-            r = requests.post(options.get("url"), params=dict(datastr=datastr))
+            r = requests.post(Urls.data_url(), params=dict(datastr=datastr))
         except:
             print("error connecting")
             data = dict(
@@ -236,9 +246,9 @@ class Manager(object):
         
         response = None
         try:
-            r = requests.get(options.get("url"))
+            r = requests.get(Urls.data_url())
         except:
-            print("error connecting to:", options.get("url"))
+            print("error connecting to:", Urls.data_url())
             return
 
         if r.text:
@@ -246,11 +256,24 @@ class Manager(object):
                 response = json.loads(r.text)
             except:
                 return
-            if response and "action" in response:
-                action = response["action"]
-                actuator = response["actuator"]
-                if actuator == "relay":
-                    self.actuators["relay"].parse_action(action)
+            if response and "actions" in response:
+                actions = response.get("actions")
+                send_status = False
+
+                for action in actions:
+                    send_status = True
+                    print(action)
+                    if action.get("action") == "relay":
+                        self.actuators["relay"].parse_action(action.get("value"))
+                    if action.get("action") == "play":
+                        # self.actuators["relay"].parse_action(action.get("value"))
+                        pass
+
+                if send_status:
+                    relay_status = self.actuators["relay"].status
+                    status = dict(entity="relay", value=relay_status)
+                    r = requests.post(Urls.status_url(), json=status)
+
     def run(self):
         while 1:
             time.sleep(1)
