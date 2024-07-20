@@ -42,11 +42,11 @@ class StatUnit:
 
 class Store(object):
     def __init__(self, name):
-        self.name = name
+        self.name = name.strip()
         self._store = {}
         self.buffer = []
-        self.filename = "data_%s.json" % name
-        print("store for %s created" % name)
+        self.filename = "data_%s.json" % self.name
+        print("store for %s created" % self.name)
 
     def load(self):
         try:
@@ -127,7 +127,7 @@ class Store(object):
                         x = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
                         ret_list.append([x, value])
 
-        if max_value > 100:
+        if max_value > 200:
             for i, items in enumerate(ret_list):
                 ret_list[i] = [items[0], 100*items[1]/max_value]
              
@@ -138,6 +138,7 @@ class Manager:
         self.sensors = {}
         self.sensor_names_filename = "data_sensor_names.json"
         self.load_sensor_names()
+        self.actions = []
         
     def load_sensor_names(self):
         names = []
@@ -157,7 +158,17 @@ class Manager:
             output = " ".join([name for name in self.get_sensor_names()])
             f.write(output)
 
-    
+    def addAction(self, action, value):
+        action_object = dict(action=action, value=value)
+        self.actions.append(action_object)
+    def getActions(self, clear=False):
+        actions = []
+        for action in self.actions:
+            actions.append(action)
+        if clear:
+            self.actions = []
+        return actions
+
     def insert(self, sensor_name, sensor_value):    
         if sensor_name not in self.sensors:
             self.sensors[sensor_name] = Store(sensor_name)
@@ -182,7 +193,9 @@ class ActionHandler(tornado.web.RequestHandler):
         self.manager = manager
     def put(self):
         action = self.get_argument("action")
-        self.manager.addAction(action)
+        value = self.get_argument("value")
+
+        self.manager.addAction(action, value)
         self.write(dict(result="ok", actions=self.manager.getActions(clear=False)))
     def get(self):
         self.write(dict(actions=self.manager.getActions(clear=False)))
@@ -206,6 +219,7 @@ class ChartsHandler(tornado.web.RequestHandler):
             x_value_formatter=lambda dt: dt.strftime(x_format),
             width=1500)
 
+        dtime = "no title"
         for sensor_name in sensors_to_show:
             data, dtime = self.manager.get_sensor_data(sensor_name)
             datetimeline.add(sensor_name, data)
@@ -218,12 +232,13 @@ class DefaultHandler(tornado.web.RequestHandler):
         self.manager = manager
     def get(self):
         self.render("index.html")
+        self.manager.addAction("get_stats", 0)
 
 class DataHandler(tornado.web.RequestHandler):
     def initialize(self, manager):
         self.manager = manager
     def get(self):
-        response = dict(action="set", actuator="relay")
+        response = dict(actions=self.manager.getActions(clear=True))
         self.write(response)
     def post(self):
         param_str = self.get_arguments("datastr")
@@ -233,18 +248,37 @@ class DataHandler(tornado.web.RequestHandler):
             sensor_value = params.get("sensor_value")
             self.manager.insert(sensor_name, sensor_value)
 
-            msg = "%s %s" % (sensor_name, sensor_value)
-            StatsSocket.send_message(msg)
+            LiveSocket.send_message(params)
 
-        self.write(dict(result="ok", action="gfy"))
+        self.write(dict(result="ok"))
 
-class StatsSocket(tornado.websocket.WebSocketHandler):
+class StatusHandler(tornado.web.RequestHandler):
+    def initialize(self, manager):
+        self.manager = manager
+    def get(self):
+        statuses = []
+        response = dict(statuses=statuses)
+        self.write(response)
+    def post(self):
+        data = tornado.escape.json_decode(self.request.body)
+        if data:
+            if data.get("entity") == "relay":
+                print("relay", data.get("value"))
+                msg = "%s %s" % (data.get("entity"), data.get("value"))
+                LiveSocket.send_message(data)
+
+            if data.get("entity") == "sound":
+                print("sound", data.get("value"))
+
+        self.write(dict(result="ok"))
+
+class LiveSocket(tornado.websocket.WebSocketHandler):
     clients = set()
     def initialize(self, manager):
         self.manager = manager
 
     def open(self):
-        StatsSocket.clients.add(self)
+        LiveSocket.clients.add(self)
 
     def on_message(self, message):
         # self.write_message(u"You said: " + message)
@@ -252,7 +286,7 @@ class StatsSocket(tornado.websocket.WebSocketHandler):
         # self.manager.send()
 
     def on_close(self):
-        StatsSocket.clients.remove(self)
+        LiveSocket.clients.remove(self)
 
     @classmethod
     def send_message(cls, message: str):
@@ -264,9 +298,10 @@ class StatsSocket(tornado.websocket.WebSocketHandler):
 class Application(tornado.web.Application):
     def __init__(self, manager):
         handlers = [
-            (r"/ws", StatsSocket, dict(manager=manager)),
+            (r"/ws", LiveSocket, dict(manager=manager)),
             (r"/data/.*", DataHandler, dict(manager=manager)),
             (r"/actions", ActionHandler, dict(manager=manager)),
+            (r"/status", StatusHandler, dict(manager=manager)),
             (r'/favicon.ico', tornado.web.StaticFileHandler),
             (r'/static/', tornado.web.StaticFileHandler),
             (r"/charts/.*", ChartsHandler, dict(manager=manager)),
