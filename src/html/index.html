@@ -20,6 +20,12 @@ button { width: 100px; margin: 5px; }
 
 <div id="controls"></div>
 
+<div class="actions">
+   <span>actions</span>
+   <div><button id="relay">toggle relay</button><span id="relay_status"></span></div>
+   <div><button id="play">play sound</button><span id="play_status"></span></div>
+</div>
+
 <div id="debug">debug</div>
 
 <script>
@@ -29,10 +35,18 @@ ws.onopen = function() {
 };
 ws.onmessage = function (evt) {
    $("#debug").append($("p").append("<strong>"+evt.data+"</strong>"));
-   // console.log(evt);
+   var data = JSON.parse(evt.data);
+   // if (data.hasOwnProperty("entity")) {
+   if (data.entity == "relay") {
+      $("span#relay_status").text(data.value);
+   }
+
+   if (data.hasOwnProperty("sensor_name")) {
+      console.log("sensor update "+evt.data)
+   }
+
    return;
    
-   var data = JSON.parse(evt.data);
    id = "#"+data.sensor_name;
    
    var sensor_name = $("<div></div>").addClass("sensor_name").html(data.sensor_name);
@@ -55,6 +69,25 @@ $(document).ready(function() {
       $("#controls").append(el);
    }
 }); 
+
+$("#relay").click(function(evt){
+   $.ajax({
+       url: '/actions',
+       type: 'PUT',
+       data: {"action": "relay", "value":"toggle"},
+       // success: function(result) {
+       //     // console.log("got back: "+result)
+       // }
+   });
+});
+$("#play").click(function(evt){
+   $.ajax({
+       url: '/actions',
+       type: 'PUT',
+       data: {"action": "play", "value":"start"},
+   });
+});
+
 
 var sensors_available = {"soil_moisture":1, "mic":1, "light":1, "temperature":1, "attic_thermo":1};
 var sensors_to_show = [];
@@ -80,9 +113,7 @@ var sensor_click = function(){
    }
    query = query.substring(0, query.length - 1)
    var src = "/charts/super"+query;
-   // console.log(src)
    embed.attr("src", src);
-   
 }
 </script>
 </body>
