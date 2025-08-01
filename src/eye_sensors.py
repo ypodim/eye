@@ -28,7 +28,7 @@ unset_pin.direction = digitalio.Direction.OUTPUT
 
 # os.system("play /usr/share/sounds/alsa/Noise.wav")
 class Urls:
-    base="http://astrapi:8888"
+    base="http://45.33.41.36:8888"
     data="/data/"
     status="/status"
 
